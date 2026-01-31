@@ -1,101 +1,36 @@
 body {
-  font-family: "Segoe UI", sans-serif;
+  font-family: Arial, sans-serif;
   background: #f5f7fb;
-  color: #333;
 }
 
-.container {
-  max-width: 900px;
-  margin: auto;
-  padding: 40px 20px;
-}
-
-.title {
-  text-align: center;
-  font-size: 28px;
-  font-weight: bold;
-  color: #2c3e50;
-  margin-bottom: 10px;
-}
-
-.subtitle {
-  text-align: center;
-  color: #6c757d;
-  margin-bottom: 30px;
-}
-
-.roomInput {
-  text-align: center;
-  margin-bottom: 25px;
-}
-
-.roomInput input {
-  padding: 10px;
-  width: 250px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-}
-
-.roomInput button {
-  margin-left: 10px;
-  padding: 10px 20px;
-  background: #007bff;
-  border: none;
-  color: white;
-  border-radius: 6px;
-  cursor: pointer;
-}
-
-.cardGrid {
+.center {
+  min-height: 100vh;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   justify-content: center;
-  gap: 20px;
+  align-items: center;
 }
 
-.voteCard {
-  background: white;
-  width: 220px;
-  padding: 18px;
-  border-radius: 12px;
-  text-align: center;
-  box-shadow: 0px 6px 18px rgba(0,0,0,0.08);
-  transition: 0.2s;
-}
-
-.voteCard:hover {
-  transform: translateY(-4px);
-}
-
-.voteCard img {
-  width: 100%;
-  border-radius: 8px;
-}
-
-.voteCard h4 {
-  margin: 12px 0 8px;
-  color: #34495e;
-}
-
-.voteBtn {
-  width: 100%;
+input {
   padding: 10px;
-  background: #007bff;
+  margin: 10px;
+  width: 220px;
+}
+
+.btn {
+  padding: 10px 20px;
+  margin: 8px;
+  background: #2563eb;
   color: white;
   border: none;
-  border-radius: 6px;
   cursor: pointer;
-  font-weight: 600;
+  border-radius: 6px;
 }
 
-.voteBtn:disabled {
-  background: #aaa;
-  cursor: not-allowed;
+.btn:hover {
+  background: #1d4ed8;
 }
 
-.timer {
-  text-align: center;
-  margin-top: 25px;
-  font-size: 14px;
-  color: #555;
+.card {
+  margin-top: 20px;
 }

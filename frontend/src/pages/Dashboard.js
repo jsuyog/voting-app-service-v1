@@ -1,30 +1,102 @@
+import { signOut } from "firebase/auth";
+import { auth, db } from "../firebase";
+
 import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+
+import { doc, getDoc } from "firebase/firestore";
+
 
 export default function Dashboard() {
-  const nav = useNavigate();
-  const user = localStorage.getItem("user");
+
+  const [username, setUsername] = useState("");
+
+  const navigate = useNavigate();
+  const user = auth.currentUser;
+
+
+  // Load username from Firestore
+  useEffect(() => {
+
+    const loadUsername = async () => {
+
+      if (!user) return;
+
+      try {
+
+        const ref = doc(db, "users", user.uid);
+        const snap = await getDoc(ref);
+
+        if (snap.exists()) {
+          setUsername(snap.data().username);
+        }
+
+      } catch (err) {
+        console.error("Username load failed", err);
+      }
+    };
+
+    loadUsername();
+
+  }, [user]);
+
+
+  const logout = async () => {
+
+    await signOut(auth);
+
+    localStorage.clear(); // optional, can remove later
+
+    navigate("/");
+  };
+
 
   return (
-    <div className="container">
-      <h2 className="title">Hello, {user}</h2>
-      <p className="subtitle">Choose your action</p>
+    <div className="center">
 
-      <div className="cardGrid">
-        <div className="voteCard">
-          <h4>Create Room</h4>
-          <button className="voteBtn" onClick={() => nav("/create")}>Create</button>
-        </div>
+      <h2>
+        Welcome{username ? `, ${username}` : ""}
+      </h2>
 
-        <div className="voteCard">
-          <h4>Vote for Room</h4>
-          <button className="voteBtn" onClick={() => nav("/vote")}>Vote</button>
-        </div>
 
-        <div className="voteCard">
-          <h4>See Results</h4>
-          <button className="voteBtn" onClick={() => nav("/results")}>Results</button>
-        </div>
+      <div className="card">
+
+        <button
+          className="btn"
+          onClick={() => navigate("/create")}
+        >
+          Create Room
+        </button>
+
+        <button
+          className="btn"
+          onClick={() => navigate("/vote")}
+        >
+          Vote for Room
+        </button>
+
+        <button
+          className="btn"
+          onClick={() => navigate("/results")}
+        >
+          View Results
+        </button>
+
       </div>
+
+
+      <button
+        className="btn"
+        style={{
+          background: "#dc2626",
+          marginTop: "20px"
+        }}
+        onClick={logout}
+      >
+        Logout
+      </button>
+
     </div>
   );
 }
+  

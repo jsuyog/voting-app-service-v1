@@ -1,88 +1,329 @@
 import { useState } from "react";
-import { voteRoom, getResults } from "../api";
+import { auth, db } from "../firebase";
+
+import {
+  doc,
+  getDoc,
+  runTransaction,
+  updateDoc,
+  serverTimestamp
+} from "firebase/firestore";
 
 export default function VoteRoom() {
+
   const [roomId, setRoomId] = useState("");
-  const [roomData, setRoomData] = useState(null);
-  const [voted, setVoted] = useState(false);
+  const [room, setRoom] = useState(null);
 
-  const user = localStorage.getItem("user");
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState("");
 
-  // Load room info from backend
+  const user = auth.currentUser;
+
+
+
+  // ===============================
+  // Load Room
+  // ===============================
   const loadRoom = async () => {
-    if (!roomId) {
-      alert("Enter Room ID");
+
+    if (!roomId.trim()) return;
+
+    try {
+      setLoading(true);
+
+      const ref = doc(db, "rooms", roomId);
+      const snap = await getDoc(ref);
+
+      if (!snap.exists()) {
+        setRoom(null);
+        setMessage("Room not found");
+        return;
+      }
+
+      setRoom({ id: snap.id, ...snap.data() });
+      setMessage("");
+
+    } catch (err) {
+
+      console.error(err);
+      setMessage("Failed to load room");
+
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
+  // ===============================
+  // Vote
+  // ===============================
+  const vote = async (index) => {
+
+    if (!room || !user) return;
+
+    if (room.status === "closed") {
+      alert("Voting is closed");
       return;
     }
 
-    const res = await getResults(roomId);
-    const data = await res.json();
+    const ref = doc(db, "rooms", room.id);
 
-    if (res.ok) {
-      setRoomData(data);
-    } else {
-      alert("Room not found or expired");
+    try {
+
+      setLoading(true);
+
+      await runTransaction(db, async (tx) => {
+
+        const snap = await tx.get(ref);
+
+        if (!snap.exists()) throw "NOT_FOUND";
+
+        const data = snap.data();
+
+
+        // Owner cannot vote
+        if (data.ownerUid === user.uid)
+          throw "OWNER";
+
+
+        // Already voted
+        if (data.voters?.includes(user.uid))
+          throw "VOTED";
+
+
+        // Closed
+        if (data.status === "closed")
+          throw "CLOSED";
+
+
+        const candidates = [...data.candidates];
+
+        candidates[index].votes =
+          (candidates[index].votes || 0) + 1;
+
+
+        tx.update(ref, {
+          candidates,
+          voters: [...(data.voters || []), user.uid]
+        });
+
+      });
+
+
+      alert("Vote submitted successfully");
+      await loadRoom();
+
+
+    } catch (err) {
+
+      if (err === "OWNER")
+        alert("Owner cannot vote");
+
+      else if (err === "VOTED")
+        alert("You already voted");
+
+      else if (err === "CLOSED")
+        alert("Voting is closed");
+
+      else
+        alert("Vote failed");
+
+      console.error(err);
+
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Submit vote
-  const submitVote = async (candidate) => {
-    const res = await voteRoom(roomId, user, candidate);
-    const data = await res.json();
 
-    if (res.ok) {
-      alert("Vote recorded successfully");
-      setVoted(true);
-      loadRoom(); // refresh live results
-    } else {
-      alert("Error: " + data.detail);
+
+  // ===============================
+  // End Voting (Owner)
+  // ===============================
+  const endVoting = async () => {
+
+    if (!room || !user) return;
+
+    if (room.ownerUid !== user.uid) {
+      alert("Only owner can end voting");
+      return;
+    }
+
+    if (room.status === "closed") {
+      alert("Already closed");
+      return;
+    }
+
+    try {
+
+      setLoading(true);
+
+
+      // Find Winner
+      let winner = "";
+      let maxVotes = -1;
+
+      room.candidates.forEach((c) => {
+        const v = c.votes || 0;
+
+        if (v > maxVotes) {
+          maxVotes = v;
+          winner = c.name;
+        }
+      });
+
+
+      await updateDoc(doc(db, "rooms", room.id), {
+
+        status: "closed",
+        rooom: room.id,
+        winner,
+
+        endedAt: serverTimestamp(),
+
+        ownerName:
+          user.email ||
+          "Unknown"
+
+      });
+
+
+      alert("Voting ended successfully");
+      await loadRoom();
+
+
+    } catch (err) {
+
+      console.error(err);
+      alert("Failed to close room");
+
+    } finally {
+      setLoading(false);
     }
   };
 
+
+
+  // ===============================
+  // UI
+  // ===============================
   return (
-    <div className="container">
-      <h2 className="title">Vote in Room</h2>
+    <div className="center">
 
-      {!roomData && (
-        <>
-          <input
-            placeholder="Enter Room ID"
-            onChange={e => setRoomId(e.target.value)}
-          />
-          <button className="voteBtn" onClick={loadRoom}>
-            Load Room
+      <h2>Vote in Room</h2>
+
+
+      {/* Room Input */}
+      <div className="card">
+
+        <input
+          placeholder="Enter Room ID"
+          value={roomId}
+          disabled={loading}
+          onChange={e => setRoomId(e.target.value)}
+        />
+
+        <button
+          className="btn"
+          onClick={loadRoom}
+          disabled={loading}
+        >
+          Load Room
+        </button>
+
+      </div>
+
+
+      {message && <p>{message}</p>}
+
+
+      {/* Owner End Button */}
+      {room &&
+        user?.uid === room.ownerUid &&
+        room.status === "active" && (
+
+          <button
+            className="btn"
+            style={{
+              background: "#dc2626",
+              marginTop: "20px"
+            }}
+            disabled={loading}
+            onClick={endVoting}
+          >
+            End Voting
           </button>
-        </>
+        )
+      }
+
+
+      {/* Status */}
+      {room && (
+
+        <h3 style={{ marginTop: "15px" }}>
+          Status: {room.status.toUpperCase()}
+        </h3>
+
       )}
 
-      {roomData && (
-        <>
-          <div className="cardGrid">
-            {Object.keys(roomData.results).map(candidate => (
-              <div key={candidate} className="voteCard">
-                <img
-                  src={`https://via.placeholder.com/200?text=${candidate}`}
-                  alt={candidate}
-                />
-                <h4>{candidate}</h4>
-                <p>{roomData.results[candidate]} votes</p>
 
-                <button
-                  disabled={voted}
-                  className="voteBtn"
-                  onClick={() => submitVote(candidate)}
-                >
-                  {voted ? "Voted" : "Vote"}
-                </button>
-              </div>
-            ))}
-          </div>
+      {/* Candidates */}
+      {room && (
 
-          <p style={{ marginTop: "20px" }}>
-            Voting ends in: {roomData.ttl} seconds
-          </p>
-        </>
+        <div
+          style={{
+            display: "flex",
+            gap: "25px",
+            marginTop: "30px",
+            justifyContent: "center",
+            flexWrap: "wrap"
+          }}
+        >
+
+          {room.candidates.map((c, i) => (
+
+            <div
+              key={i}
+              className="card"
+              style={{ width: "220px" }}
+            >
+
+              <img
+                src={c.image}
+                alt={c.name}
+                style={{
+                  width: "100%",
+                  height: "200px",
+                  objectFit: "cover",
+                  borderRadius: "12px"
+                }}
+              />
+
+              <h4>{c.name}</h4>
+
+              <p>Votes: {c.votes || 0}</p>
+
+
+              <button
+                className="btn"
+                disabled={
+                  loading ||
+                  room.status === "closed"
+                }
+                onClick={() => vote(i)}
+              >
+                Vote
+              </button>
+
+            </div>
+
+          ))}
+
+        </div>
+
       )}
+
     </div>
   );
 }

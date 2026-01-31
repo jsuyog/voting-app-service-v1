@@ -1,35 +1,31 @@
 import { useState } from "react";
-import { auth, db } from "../firebase";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { auth } from "../firebase";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "../firebase";
 import { useNavigate } from "react-router-dom";
 
 export default function ChooseUsername() {
   const [username, setUsername] = useState("");
-  const nav = useNavigate();
-  const user = auth.currentUser;
+  const navigate = useNavigate();
 
   const submit = async () => {
-    const ref = doc(db, "users", user.uid);
-    const snap = await getDoc(ref);
+    const user = auth.currentUser;
 
-    if (snap.exists()) {
-      nav("/dashboard");
-      return;
-    }
+    if (!user) return;
 
-    await setDoc(ref, {
-      email: user.email,
-      username: username
+    await setDoc(doc(db, "users", user.uid), {
+      username,
+      email: user.email
     });
 
-    nav("/dashboard");
+    navigate("/dashboard");
   };
 
   return (
-    <div className="container">
+    <div className="center">
       <h2>Choose Username</h2>
       <input onChange={e => setUsername(e.target.value)} />
-      <button onClick={submit}>Continue</button>
+      <button className="btn" onClick={submit}>Save</button>
     </div>
   );
 }
